@@ -1,0 +1,118 @@
+import random
+import pymysql
+import pandas as pd
+
+def case(ask):
+    '''
+    功能：判断课前点名未到学生是请假还是暂计入旷课。 
+    '''
+    if ask == '1':
+        ask_list.append([student_no,student_name])          
+        print("请假")    
+    elif ask == '0': 
+        no_ask_list.append([student_no,student_name]) 
+        print("暂计入旷课")
+
+def after_class(list1,list2,list3):
+    '''
+    功能：课后点名，判断旷课、迟到、早退。 
+    '''
+    for student_no,student_name in list1:
+        res = input(f"{student_name}？\t") 
+        if res == '1': 
+            list2.append([student_no,student_name])        
+        elif res == '0': 
+            list3.append([student_no,student_name])
+
+def pdbc(ask_l,absence_l,late_l,early_l):      
+    '''
+    功能：将未到学生按照请假、旷课、迟到、早退四类分别存储在数据库的四个表中。
+    '''
+    try:        
+        # 使用cursor执行SQL语句        
+        ask_insert = """insert into ask_student
+               values(%s,%s)"""        
+        absence_insert = """insert into absence_student
+                values(%s,%s)"""        
+        late_insert = """insert into late_student
+                 values(%s,%s)""" 
+        early_insert = """insert into early_student
+                values(%s,%s)"""
+        cursor.executemany(ask_insert,ask_l)
+        cursor.executemany(absence_insert,absence_l)
+        cursor.executemany(late_insert,late_l)        
+        cursor.executemany(early_insert,early_l)
+        
+    # 提交事务        
+    conn.commit()        
+    ask_select = "select * from ask_student"        
+    absence_select = "select * from absence_student"        
+    late_select = "select * from late_student"        
+    early_select = "select * from early_student"        
+    print("\n-----* 请假名单 *-----")        
+    select_info(ask_select)        
+    print("\n-----* 旷课名单 *-----")          
+    select_info(absence_select)        
+    print("\n-----* 迟到名单 *-----")       
+    select_info(late_select)        
+    print("\n-----* 早退名单 *-----")         
+    select_info(early_select)  
+    except:        
+    # 发生错误,执行回滚        
+    print("出错!")        
+    conn.rollback()
+      
+def select_info(sql):
+    '''
+    功能：从MySQL数据库各表中读取请假、旷课、迟到、早退四类信息并分别展示。 
+    '''      
+    cursor.execute(sql)    
+    results = cursor.fetchall()    
+    for row in results:        
+    No = row[0]        
+    Name = row[1]        
+    print ("%s,%s" % (No, Name))
+
+# main()
+student_info = pd.read_excel("数应191身份证.xls")
+info_list1 = student_info.values.tolist()    # 将导入的学生信息转换成列表
+info_list2 = []         # 存储第一次点名答到的学生名单
+ask_list = []           # 存储请假学生名单
+no_ask_list = []        # 存储伪旷课学生名单(未请假学生名单)
+absence_list = []       # 存储旷课学生名单
+late_list = []          # 存储迟到学生名单
+early_list =[]          # 存储早退学生名单
+useless_list = []       # 为减少代码的冗余所用的无实际含义
+random.shuffle(info_list1)    # 学生名单随机排序 
+
+# 课前点名
+print("-----* 课前点名开始 *-----")
+print("1:到了\t\t0:未到\t\t")
+for student_no,student_name in info_list1:    
+    res = input(f"{student_name}？\t")    
+    if res == '1':        
+    info_list2.append([student_no,student_name]) 
+    elif res == '0':        
+        ask = input("有请假条吗？\t1:有\t0:无\t")        
+        case(ask) 
+    
+# 课后点名
+print("\n-----* 课后点名开始 *-----")
+print("1:到了\t\t0：未到\t\t")
+after_class(no_ask_list,late_list,absence_list)
+after_class(info_list2,useless_list,early_list)  
+
+# 连接数据库,创建connect对象,获取cursor
+conn=pymysql.connect(host="localhost",port=3306,user="root",passwd="123456",db="roll_call_db")    # 分别对应host、port、user、passwd、db
+cursor = conn.cursor() 
+
+# 将全部学生信息存入数据库中表info_student
+info_insert = """insert into info_student
+         values(%s,%s)"""
+cursor.executemany(info_insert,info_list1)
+
+pdbc(ask_list,absence_list,late_list,early_list)     
+
+# 关闭cursor、connect
+cursor.close()
+conn.close()

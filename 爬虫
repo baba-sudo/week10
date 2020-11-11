@@ -1,0 +1,25 @@
+import scrapy
+from scrapy.selector import Selector
+class ArticleSpider(scrapy.Spider):
+    name = 'biquge'
+    allowed_domains = ['uuzuowen.com']
+    start_urls = ['https://www.uuzuowen.com/mingzhu/luanshijiaren/']
+
+def parse(self, response):
+    selector = Selector(response)
+    find_all = selector.xpath('/http/body/div[@id="head"]/div[@class="mainBox"]/div[@class="mleft mtop"]/div[@class="listbox"]/[@class="listcss"]//text()').extract()
+    for section in find_all:
+        href = section.xpath('.//@href').extract_first()
+        real_url = response.urljion(href)
+        print(real_url)
+        request = scrapy.Request(real_url,callback=self.parse_detail)
+        yield request
+def parse_detail(self, response):
+    selector = Selector(response)
+    content_list = selector.xpath('//div[@class="articleContent"]/text()').extract()
+    for real in content:
+        print (real)
+        content = '\n'.join(content_list)
+        item = dict()
+        item['content'] = content
+        print(item)
